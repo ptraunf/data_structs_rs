@@ -1,5 +1,6 @@
 use std::fmt::Display;
 use fasthash::{murmur3, spooky};
+use crate::Error;
 use crate::set::Set;
 
 pub struct BloomFilter {
@@ -87,6 +88,10 @@ impl BloomFilter {
         }
         set_bits as usize == self.k
     }
+
+    pub fn can_compare(&self, rhs: &BloomFilter) -> bool {
+        self.num_bits == rhs.num_bits && self.p == rhs.p && self.capacity == rhs.capacity && self.k == rhs.k
+    }
     pub fn false_positive_probability(&self) -> f64 {
         self.p.clone()
     }
@@ -100,6 +105,51 @@ impl Set for BloomFilter {
     }
     fn contains(&self, e: String) -> bool {
         self.contains(e)
+    }
+
+    fn equals(&self, other: Self) -> bool {
+        if !self.can_compare(&other) {
+            return false;
+        }
+        for i in 0..self.bytes.len() {
+            if self.bytes[i] ^ other.bytes[i] != 0 {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    fn union(&self, other: Self) -> crate::Result<Self> {
+        if !self.can_compare(&other) {
+            return Err(Error::IllegalArguments(String::from("Bloom Filters must have the same parameters.")));
+        }
+        let mut union = BloomFilter::new(self.capacity, self.p);
+        for i in 0..self.bytes.len() {
+            union.bytes[i] = self.bytes[i] | other.bytes[i];
+        }
+        return Ok(union);
+    }
+
+    fn intersection(&self, other: Self) -> crate::Result<Self> {
+        if !self.can_compare(&other) {
+            return Err(Error::IllegalArguments(String::from("Bloom Filters must have the same parameters.")));
+        }
+        let mut intersection = BloomFilter::new(self.capacity, self.p);
+        for i in 0..self.bytes.len() {
+            intersection.bytes[i] = self.bytes[i] & other.bytes[i];
+        }
+        return Ok(intersection);
+    }
+
+    fn difference(&self, other: Self) -> crate::Result<Self> {
+        if !self.can_compare(&other)  {
+            return Err(Error::IllegalArguments(String::from("Bloom Filters must have the same parameters.")));
+        }
+        let mut intersection = BloomFilter::new(self.capacity, self.p);
+        for i in 0..self.bytes.len() {
+            intersection.bytes[i] = self.bytes[i] & (self.bytes[i] ^ other.bytes[i]);
+        }
+        return Ok(intersection);
     }
 }
 
@@ -118,6 +168,7 @@ impl Display for BloomFilter {
 
 #[cfg(test)]
 mod test {
+    use crate::set::Set;
     use super::BloomFilter;
 
     #[test]
@@ -145,7 +196,6 @@ mod test {
 
     #[test]
     fn test_bloom_filter_does_not_contain() {
-
         let capacity = 64;
         let p_of_false_positive = 0.01;
         let mut bf: BloomFilter = BloomFilter::new(capacity, p_of_false_positive);
@@ -160,5 +210,112 @@ mod test {
         println!("BF contains {s}? {contains_s}");
 
         println!("BF:\n{bf}");
+    }
+
+    #[test]
+    fn test_two_empty_filters_are_equal_true() {
+        let capacity = 128;
+        let p_of_false_positive = 0.01;
+        let bf1: BloomFilter = BloomFilter::new(capacity, p_of_false_positive);
+        let bf2: BloomFilter = BloomFilter::new(capacity, p_of_false_positive);
+        assert!(bf1.equals(bf2));
+    }
+    #[test]
+    fn test_equals_not_comparable() {
+
+        let mut bf1: BloomFilter = BloomFilter::new(32, 0.02);
+        let mut bf2: BloomFilter = BloomFilter::new(64, 0.01);
+        bf1.insert(String::from("ABCDE"));
+        bf2.insert(String::from("ABCDE"));
+
+        assert!(!bf1.equals(bf2));
+    }
+    #[test]
+    fn test_equals_negative() {
+        let capacity = 128;
+        let p_of_false_positive = 0.01;
+
+        let mut bf1: BloomFilter = BloomFilter::new(capacity, p_of_false_positive);
+        let mut bf2: BloomFilter = BloomFilter::new(capacity, p_of_false_positive);
+        bf1.insert(String::from("ABCDE"));
+        bf2.insert(String::from("WXYZ"));
+
+        assert!(!bf1.equals(bf2));
+    }
+    #[test]
+    fn test_bloom_filters_are_equal_positive() {
+        let capacity = 128;
+        let p_of_false_positive = 0.01;
+
+        let mut bf1: BloomFilter = BloomFilter::new(capacity, p_of_false_positive);
+        let mut bf2: BloomFilter = BloomFilter::new(capacity, p_of_false_positive);
+        let s = "Test String OK";
+        bf1.insert(String::from(s));
+        bf2.insert(String::from(s));
+
+        assert!(bf1.equals(bf2));
+    }
+
+    #[test]
+    fn test_union() {
+        let capacity = 128;
+        let p_of_false_positive = 0.01;
+
+        let mut bf1: BloomFilter = BloomFilter::new(capacity, p_of_false_positive);
+        let mut bf2: BloomFilter = BloomFilter::new(capacity, p_of_false_positive);
+
+        bf1.insert(String::from("A"));
+        bf1.insert(String::from("B"));
+
+        bf2.insert(String::from("B"));
+        bf2.insert(String::from("C"));
+
+        let union = bf1.union(bf2).unwrap();
+
+        assert!(union.contains(String::from("A")));
+        assert!(union.contains(String::from("B")));
+        assert!(union.contains(String::from("C")));
+    }
+
+    #[test]
+    fn test_intersection() {
+        let capacity = 128;
+        let p_of_false_positive = 0.01;
+
+        let mut bf1: BloomFilter = BloomFilter::new(capacity, p_of_false_positive);
+        let mut bf2: BloomFilter = BloomFilter::new(capacity, p_of_false_positive);
+
+        bf1.insert(String::from("A"));
+        bf1.insert(String::from("B"));
+
+        bf2.insert(String::from("B"));
+        bf2.insert(String::from("C"));
+
+        let intersection = bf1.intersection(bf2).unwrap();
+
+        assert!(!intersection.contains(String::from("A")));
+        assert!(intersection.contains(String::from("B")));
+        assert!(!intersection.contains(String::from("C")));
+    }
+
+    #[test]
+    fn test_difference() {
+        let capacity = 128;
+        let p_of_false_positive = 0.01;
+
+        let mut bf1: BloomFilter = BloomFilter::new(capacity, p_of_false_positive);
+        let mut bf2: BloomFilter = BloomFilter::new(capacity, p_of_false_positive);
+
+        bf1.insert(String::from("A"));
+        bf1.insert(String::from("B"));
+
+        bf2.insert(String::from("B"));
+        bf2.insert(String::from("C"));
+
+        let difference = bf1.difference(bf2).unwrap();
+        // ( A B ) - ( B C ) = ( A )
+        assert!(difference.contains(String::from("A")));
+        assert!(!difference.contains(String::from("B")));
+        assert!(!difference.contains(String::from("C")));
     }
 }
