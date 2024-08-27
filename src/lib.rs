@@ -2,6 +2,7 @@ use std::fmt::Formatter;
 
 pub mod set;
 pub mod bloom_filter;
+pub mod queue;
 pub mod graph;
 
 #[derive(Debug)]
