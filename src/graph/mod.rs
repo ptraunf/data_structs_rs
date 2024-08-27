@@ -1,5 +1,7 @@
 use std::cmp::{Eq, PartialEq};
 use std::{collections::HashSet, fmt::Display};
+use std::fmt::{Debug, Formatter};
+
 pub mod search;
 pub mod path;
 pub mod span_tree;
@@ -27,59 +29,47 @@ impl<'a, T: PartialEq + Eq + Display> PartialEq for Node<'a, T> {
 }
 impl<'a, T: Eq + Display> Eq for Node<'a, T> {}
 
-
-trait Weighted {
-    type W: PartialOrd + Ord;
-    fn weight(&self) -> Self::W;
-}
-trait Directed {
-    fn subject(&self) -> &Node<Self::N>;
-    fn object(&self) -> &Node<Self::N>;
-}
-trait Undirected {
-    type N: Display;
-    fn vertices(&self) -> (&Node<Self::N>, &Node<Self::N>);
-}
-// pub trait IEdge {
-//     type N: Display;
-//     fn new(from: &Node<Self::N>, to: &Node<Self::N>) -> Self;
-//     fn subject(&self) -> &Node<Self::N>;
-//     fn object(&self) -> &Node<Self::N>;
-// }
-
-
-pub struct Edge<'a, T: Eq + Display> {
+pub struct Edge<'a, T: Eq + Display, W> {
     subject: &'a Node<'a, T>,
     object: &'a Node<'a, T>,
+    weight: W
 }
-impl<'a, T: Eq + Display> Edge<'a, T> {
+impl<'a, T: Eq + Display, W> Edge<'a, T, W> where W: Default {
+
     pub fn new(from: &'a Node<'a, T>, to: &'a Node<'a, T>) -> Self {
         Edge {
             subject: from,
             object: to,
+            weight: W::default()
+        }
+    }
+    pub fn new_weighted(from: &'a Node<'a, T>, to: &'a Node<'a, T>, weight: W) -> Self {
+        Edge {
+            subject: from,
+            object: to,
+            weight: weight
         }
     }
 }
-pub struct Graph<'a, T: Eq + Display> {
+
+pub struct Graph<'a, T: Eq + Display, W> {
     nodes: Vec<&'a Node<'a, T>>,
-    edges: Vec<&'a Edge<'a, T>>,
+    edges: Vec<&'a Edge<'a, T, W>>,
 }
 
-impl<'a, T: Eq + Display> Display for Graph<'a, T> {
+impl<'a, T: Eq + Display, W: Debug> Display for Graph<'a, T, W>
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for node in &self.nodes {
             writeln!(f, "Node: {}", node)?;
         }
         for edge in &self.edges {
-            writeln!(f, "Edge: {}->{}", edge.subject, edge.object)?;
+            writeln!(f, "Edge: {}-{:?}->{}", edge.subject, edge.weight, edge.object)?;
         }
 
         Ok(())
     }
 }
-
-
-
 
 #[cfg(test)]
 pub mod test {
@@ -95,7 +85,7 @@ pub mod test {
         let a_to_b = Edge::new(&a, &b);
         let b_to_d = Edge::new(&b, &d);
         let d_to_e = Edge::new(&d, &e);
-        let g: Graph<char> = Graph {
+        let g: Graph<char, ()> = Graph {
             nodes: vec![&a, &b, &c, &d, &e],
             edges: vec![&a_to_b, &a_to_c, &b_to_d, &d_to_e],
         };

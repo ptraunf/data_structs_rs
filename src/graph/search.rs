@@ -3,7 +3,7 @@ use std::fmt::Display;
 use crate::graph::{Edge, Graph, Node};
 
 pub fn depth_first_search<'a, T: Eq + Display>(
-    g: &'a Graph<'a, T>,
+    g: &'a Graph<'a, T, ()>,
     search: T,
 ) -> Option<&'a Node<'a, T>> {
     let start_node = g.nodes.first().unwrap();
@@ -39,7 +39,7 @@ pub fn depth_first_search<'a, T: Eq + Display>(
 
 // "Patient"
 pub fn breadth_first_search<'a, T: Eq + Display>(
-    g: &'a Graph<'a, T>,
+    g: &'a Graph<'a, T, ()>,
     search: T,
 ) -> Option<&'a Node<'a, T>> {
     todo!()
@@ -59,7 +59,7 @@ pub mod test {
         let a_to_b = Edge::new(&a, &b);
         let b_to_d = Edge::new(&b, &d);
         let d_to_e = Edge::new(&d, &e);
-        let g: Graph<char> = Graph {
+        let g: Graph<char, ()> = Graph {
             nodes: vec![&a, &b, &c, &d, &e],
             edges: vec![&a_to_b, &a_to_c, &b_to_d, &d_to_e],
         };
