@@ -4,6 +4,7 @@ pub mod search;
 pub mod path;
 pub mod span_tree;
 
+// type NodeValue = Eq + PartialEq + Display;
 pub struct Node<'a, T: Eq + PartialEq + Display> {
     id: &'a str,
     value: T,
@@ -26,11 +27,27 @@ impl<'a, T: PartialEq + Eq + Display> PartialEq for Node<'a, T> {
 }
 impl<'a, T: Eq + Display> Eq for Node<'a, T> {}
 
-// pub struct Edge<'a, W: Ord, T: Eq + Display> {
-//     subject: &'a Node<'a, T>,
-//     object: &'a Node<'a, T>,
-//     weight: W,
+
+trait Weighted {
+    type W: PartialOrd + Ord;
+    fn weight(&self) -> Self::W;
+}
+trait Directed {
+    fn subject(&self) -> &Node<Self::N>;
+    fn object(&self) -> &Node<Self::N>;
+}
+trait Undirected {
+    type N: Display;
+    fn vertices(&self) -> (&Node<Self::N>, &Node<Self::N>);
+}
+// pub trait IEdge {
+//     type N: Display;
+//     fn new(from: &Node<Self::N>, to: &Node<Self::N>) -> Self;
+//     fn subject(&self) -> &Node<Self::N>;
+//     fn object(&self) -> &Node<Self::N>;
 // }
+
+
 pub struct Edge<'a, T: Eq + Display> {
     subject: &'a Node<'a, T>,
     object: &'a Node<'a, T>,
